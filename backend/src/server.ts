@@ -5,6 +5,7 @@ import { connectDB } from "./config/db";
 import diagnosticRoutes from "./routes/diagnosticRoutes";
 import articleRoutes from "./routes/articleRoutes";
 import sessionRoutes from "./routes/sessionRoutes";
+import authRoutes from "./routes/authRoutes";
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173" }));
 app.use("/api/diagnostics", diagnosticRoutes);
 app.use("/api/articles", articleRoutes);
 app.use("/api/sessions", sessionRoutes);
+app.use("/api/auth", authRoutes);
 
 connectDB().then(() => {
   const PORT = process.env.PORT || 5000;

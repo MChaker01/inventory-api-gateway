@@ -32,9 +32,8 @@ export const connectDB = async () => {
     return pool;
   } catch (error) {
     console.error("❌ SQL Connection Failed:", (error as Error).message);
-    // Do not kill the process, let it retry or fail gracefully
+    process.exit(1);
   }
 };
 
 export { sql };
-

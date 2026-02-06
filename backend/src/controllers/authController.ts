@@ -25,7 +25,7 @@ export const loginUser = async (req: Request, res: Response) => {
 
     // 2. Get User from DB
     const result =
-      await request.query`SELECT * FROM Users WHERE username = @username`;
+      await request.query`SELECT * FROM Users WHERE username = @username AND (deleted is NULL OR deleted = 0)`;
 
     const db_user = result.recordset[0] as IUser;
 

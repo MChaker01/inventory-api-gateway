@@ -6,6 +6,7 @@ import diagnosticRoutes from "./routes/diagnosticRoutes";
 import articleRoutes from "./routes/articleRoutes";
 import sessionRoutes from "./routes/sessionRoutes";
 import authRoutes from "./routes/authRoutes";
+import resourceRoutes from "./routes/resourceRoutes";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use("/api/diagnostics", diagnosticRoutes);
 app.use("/api/articles", articleRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/resources", resourceRoutes);
 
 connectDB().then(() => {
   const PORT = process.env.PORT || 5000;

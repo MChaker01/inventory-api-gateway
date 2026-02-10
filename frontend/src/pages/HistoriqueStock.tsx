@@ -22,32 +22,30 @@ const HistoriqueStock = () => {
   const [depots, setDepots] = useState<string[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
 
-  // FETCH DATA
+  // 1. Define Fetch Function
+  const fetchAllData = async () => {
+    setIsLoading(true);
+    try {
+      const [history, depots, groups] = await Promise.all([
+        api.get("/sessions/history"),
+        api.get("/resources/depots"),
+        api.get("/resources/groups"),
+      ]);
+      setSessions(history.data.history);
+      setDepots(depots.data);
+      setGroups(groups.data);
+    } catch (err) {
+      const error = err as AxiosError<{ message: string }>; // Type Casting
+      console.error("Failed to load session history.", error);
+      setError(
+        error.response?.data?.message || "Failed to load session history.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const [history_response, depots_response, groups_response] =
-          await Promise.all([
-            api.get("/sessions/history"),
-            api.get("/resources/depots"),
-            api.get("/resources/groups"),
-          ]);
-
-        setSessions(history_response.data.history);
-        setDepots(depots_response.data);
-        setGroups(groups_response.data);
-      } catch (err) {
-        const error = err as AxiosError<{ message: string }>; // Type Casting
-        console.error("Failed to load session history.", error);
-        setError(
-          error.response?.data?.message || "Failed to load session history.",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchHistory();
+    fetchAllData();
   }, []);
 
   // Helper to format SQL Dates (2026-02-07T10:00:00.000Z) -> Readable
@@ -196,6 +194,7 @@ const HistoriqueStock = () => {
       <NewSessionModal
         isOpen={isModalFormOpen}
         onClose={() => setIsModalFormOpen(false)}
+        onSuccess={fetchAllData}
         depots={depots}
         groups={groups}
       />

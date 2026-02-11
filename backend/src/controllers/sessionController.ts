@@ -28,14 +28,44 @@ export const getActiveSessions = async (req: Request, res: Response) => {
 
 export const getSessionHistory = async (req: Request, res: Response) => {
   try {
-    const result = await sql.query`SELECT TOP 100 
-    id, depot, date, group_article, valide, id_chef, id_control 
-FROM Groupe_stock 
-ORDER BY date DESC`;
+    // 1. Get Query Params (Default to Page 1, Limit 10)
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
 
-    const history = result.recordset as ISession[];
+    const request = new sql.Request();
+    request.input("offset", sql.Int, offset);
+    request.input("limit", sql.Int, limit);
 
-    res.status(200).json({ success: true, history: history });
+    // 2. Query 1: Get Total Count (For pagination UI)
+    const countResult = await request.query(
+      "SELECT COUNT(*) as total FROM Groupe_stock",
+    );
+    const totalItems = countResult.recordset[0].total;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // 3. Query 2: Get Paginated Data
+    // NOTICE: We MUST have an ORDER BY for OFFSET to work
+    const query = `
+      SELECT id, depot, date, group_article, valide, id_chef, id_control 
+      FROM Groupe_stock 
+      ORDER BY date DESC
+      OFFSET @offset ROWS 
+      FETCH NEXT @limit ROWS ONLY
+    `;
+
+    const result = await request.query(query);
+
+    res.status(200).json({
+      success: true,
+      data: result.recordset,
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        totalPages,
+      },
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, error: (error as Error).message });
@@ -82,12 +112,12 @@ export const createSession = async (req: Request, res: Response) => {
       // item.qte_globale coming from Excel "Stk Unité"
       requestItem.input("sid", sql.Int, sessionId);
       requestItem.input("code", sql.VarChar, item.code_article);
-      requestItem.input("art_name", sql.VarChar, item.article || "");
       requestItem.input("qty_sys", sql.Float, item.qte_globale || 0);
       // qte_physique starts at 0
 
-      await requestItem.query`INSERT INTO Stock_item (id_group_stock, id_article, article, qte_globale, qte_physique)
-        VALUES (@sid, @code, @art_name, @qty_sys, 0)`;
+      await requestItem.query`INSERT INTO Stock_item 
+  (id_group_stock, id_article, qte_globale, qte_physique, Qte_sosadis, qte_perime_nr)
+  VALUES (@sid, @code, @qty_sys, 0, 0, 0)`;
     }
 
     // 4. Commit (Save everything)
@@ -110,23 +140,27 @@ export const createSession = async (req: Request, res: Response) => {
 // @route   GET /api/sessions/:id/items
 export const getSessionItems = async (req: Request, res: Response) => {
   try {
-    const sessionId = req.params.id;
+    const sessionId = parseInt(req.params.id as string); // Validates it's a number
 
     const request = new sql.Request();
     request.input("sid", sql.Int, sessionId);
 
-    // We select specifically from Stock_item to get ONLY the imported rows
+    // FIX:
+    // 1. Use 'id_article' (from Stock_item) as 'code_article'
+    // 2. JOIN with Article table to get the name ('article' column)
     const query = `
       SELECT 
         si.id, 
-        si.code_article, 
-        si.article, 
+        si.id_article AS code_article, 
+        A.article, 
+        A.Prix,
         si.qte_globale, 
         si.qte_physique,
         si.qrcode
       FROM Stock_item si
+      LEFT JOIN Article A ON si.id_article = A.code_article
       WHERE si.id_group_stock = @sid
-      ORDER BY si.article ASC
+      ORDER BY A.article ASC
     `;
 
     const result = await request.query(query);
@@ -184,7 +218,7 @@ export const validateSession = async (req: Request, res: Response) => {
 
     // 2. Fix Types: IDs are Int, Usernames are VarChar
     request.input("id", sql.Int, sessionId);
-    request.input("controller", sql.VarChar, username); 
+    request.input("controller", sql.VarChar, username);
 
     // 3. The Query
     // We hardcode 'valide = 1' because this function ALWAYS validates.
@@ -205,7 +239,9 @@ export const validateSession = async (req: Request, res: Response) => {
       });
     }
 
-    res.status(200).json({ success: true, message: "Session validated successfully." });
+    res
+      .status(200)
+      .json({ success: true, message: "Session validated successfully." });
   } catch (error) {
     console.error("❌ SQL Error:", error);
     res.status(500).json({ success: false, error: (error as Error).message });

@@ -31,15 +31,18 @@ export const getSessionHistory = async (req: Request, res: Response) => {
     // 1. Get Query Params (Default to Page 1, Limit 10)
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
+    const search = (req.query.search as string) || "";
     const offset = (page - 1) * limit;
 
     const request = new sql.Request();
     request.input("offset", sql.Int, offset);
     request.input("limit", sql.Int, limit);
+    request.input("search", sql.VarChar, `%${search}%`);
 
     // 2. Query 1: Get Total Count (For pagination UI)
     const countResult = await request.query(
-      "SELECT COUNT(*) as total FROM Groupe_stock",
+      `SELECT COUNT(*) as total FROM Groupe_stock 
+       WHERE group_article LIKE @search OR depot LIKE @search OR id_chef LIKE @search`,
     );
     const totalItems = countResult.recordset[0].total;
     const totalPages = Math.ceil(totalItems / limit);
@@ -49,6 +52,7 @@ export const getSessionHistory = async (req: Request, res: Response) => {
     const query = `
       SELECT id, depot, date, group_article, valide, id_chef, id_control 
       FROM Groupe_stock 
+      WHERE group_article LIKE @search OR depot LIKE @search OR id_chef LIKE @search
       ORDER BY date DESC
       OFFSET @offset ROWS 
       FETCH NEXT @limit ROWS ONLY
@@ -69,6 +73,29 @@ export const getSessionHistory = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, error: (error as Error).message });
+  }
+};
+
+// @desc    Get Session Header (Status, Depot, etc.)
+// @route   GET /api/sessions/:id
+export const getSessionById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const result = await sql.query`
+      SELECT id, depot, date, group_article, valide, id_chef 
+      FROM Groupe_stock 
+      WHERE id = ${id}
+    `;
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    res.status(200).json(result.recordset[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server Error" });
   }
 };
 
@@ -112,12 +139,15 @@ export const createSession = async (req: Request, res: Response) => {
       // item.qte_globale coming from Excel "Stk Unité"
       requestItem.input("sid", sql.Int, sessionId);
       requestItem.input("code", sql.VarChar, item.code_article);
+      // 1. Pass the name from Excel
+      requestItem.input("name", sql.VarChar, item.article_name || "");
       requestItem.input("qty_sys", sql.Float, item.qte_globale || 0);
       // qte_physique starts at 0
 
+      // 2. Insert into 'descreption' (Note the DB typo)
       await requestItem.query`INSERT INTO Stock_item 
-  (id_group_stock, id_article, qte_globale, qte_physique, Qte_sosadis, qte_perime_nr)
-  VALUES (@sid, @code, @qty_sys, 0, 0, 0)`;
+  (id_group_stock, id_article, qte_globale, qte_physique, Qte_sosadis, qte_perime_nr, descreption)
+  VALUES (@sid, @code, @qty_sys, 0, 0, 0, @name)`;
     }
 
     // 4. Commit (Save everything)
@@ -152,7 +182,9 @@ export const getSessionItems = async (req: Request, res: Response) => {
       SELECT 
         si.id, 
         si.id_article AS code_article, 
-        A.article, 
+                -- LOGIC: Try to get name from Master Table. If NULL, use the backup from Excel (descreption)
+                COALESCE(A.article, si.descreption, 'Article Inconnu') AS article, 
+
         A.Prix,
         si.qte_globale, 
         si.qte_physique,

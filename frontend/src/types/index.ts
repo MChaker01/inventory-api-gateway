@@ -7,3 +7,13 @@ export interface Session {
   id_chef: string;
   id_control: string | null;
 }
+
+// Define the Item Interface
+export interface SocketItem {
+  id: number;
+  code_article: string;
+  article: string;
+  Prix: number;
+  qte_globale: number;
+  qte_physique: number;
+}

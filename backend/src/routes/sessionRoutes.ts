@@ -5,6 +5,7 @@ import {
   getSessionHistory,
   createSession,
   getSessionItems,
+  getSessionById,
   updateItemCount,
   validateSession,
 } from "../controllers/sessionController";
@@ -15,8 +16,10 @@ router.use(protect);
 router.get("/", getActiveSessions);
 router.get("/history", getSessionHistory);
 router.post("/", createSession);
+router.get("/:id", getSessionById);
 router.get("/:id/items", getSessionItems);
 router.put("/items/:id", updateItemCount);
 router.put("/:id/validate", validateSession);
+
 
 export default router;

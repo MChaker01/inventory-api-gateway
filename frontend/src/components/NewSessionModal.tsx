@@ -16,6 +16,7 @@ interface NewSessionModalProps {
 // 2. Define Internal Types
 interface ParsedItem {
   code_article: string;
+  article_name: string;
   qte_globale: number;
 }
 
@@ -76,6 +77,15 @@ const NewSessionModal = ({
             col.toLowerCase().includes("unit"),
         );
 
+        // Find Name Column
+        // Look for "Article", "Designation", or "Description"
+        const nameColumnName = columnNames.find(
+          (col) =>
+            col.toLowerCase().includes("article") ||
+            col.toLowerCase().includes("designation") ||
+            col.toLowerCase().includes("description"),
+        );
+
         if (!qtyColumnName) {
           throw new Error("Colonne 'Stk Unité' introuvable.");
         }
@@ -93,6 +103,12 @@ const NewSessionModal = ({
           const code = String(row["Code"] || "").trim();
           const stkUniteValue = row[qtyColumnName];
 
+          // Extract Name
+          // If column not found, default to empty string
+          const name = nameColumnName
+            ? String(row[nameColumnName] || "").trim()
+            : "";
+
           let qte = 0;
           if (typeof stkUniteValue === "number") {
             qte = stkUniteValue;
@@ -105,6 +121,7 @@ const NewSessionModal = ({
 
           return {
             code_article: code,
+            article_name: name,
             qte_globale: qte,
           };
         });
@@ -244,7 +261,7 @@ const NewSessionModal = ({
                   setParsedItems([]);
                   setError("");
                 }}
-                className="text-xs text-red-600 hover:text-red-800 font-medium"
+                className="text-xs text-red-600 hover:text-red-800 font-medium cursor-pointer"
               >
                 Réinitialiser
               </button>
@@ -257,6 +274,9 @@ const NewSessionModal = ({
                     <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
                       Code Article
                     </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
+                      Article
+                    </th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-slate-600">
                       Qté Globale
                     </th>
@@ -267,6 +287,9 @@ const NewSessionModal = ({
                     <tr key={idx} className="hover:bg-slate-50">
                       <td className="px-4 py-2 font-mono text-xs">
                         {item.code_article}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-slate-700 truncate max-w-50">
+                        {item.article_name}
                       </td>
                       <td className="px-4 py-2 text-right">
                         {item.qte_globale}
@@ -293,7 +316,7 @@ const NewSessionModal = ({
         <div className="flex gap-3 justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 transition"
+            className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 transition cursor-pointer"
           >
             Annuler
           </button>
@@ -304,7 +327,7 @@ const NewSessionModal = ({
               parsedItems.length === 0 ||
               isLoading
             }
-            className="px-4 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             onClick={handleCreateSession}
           >
             Créer Session ({parsedItems.length})

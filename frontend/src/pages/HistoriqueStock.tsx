@@ -24,25 +24,29 @@ const HistoriqueStock = () => {
   const [groups, setGroups] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const navigate = useNavigate();
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Note: We use the 'page' state here, so it must be in the dependency array below
+      // Add &search=${debouncedSearch}
       const [historyRes, depotsRes, groupsRes] = await Promise.all([
-        api.get(`/sessions/history?page=${page}&limit=10`),
+        api.get(
+          `/sessions/history?page=${page}&limit=10&search=${debouncedSearch}`,
+        ),
         api.get("/resources/depots"),
         api.get("/resources/groups"),
       ]);
 
-      setSessions(historyRes.data.data); // Assuming you fixed the backend response structure
-      setTotalPages(historyRes.data.pagination.totalPages); // Assuming backend sends this
+      setSessions(historyRes.data.data);
+      setTotalPages(historyRes.data.pagination.totalPages);
       setDepots(depotsRes.data);
       setGroups(groupsRes.data);
     } catch (err) {
-      const error = err as AxiosError<{ message: string }>; // Type Casting
+      const error = err as AxiosError<{ message: string }>;
       console.error("Failed to load session history.", error);
       setError(
         error.response?.data?.message || "Failed to load session history.",
@@ -50,11 +54,21 @@ const HistoriqueStock = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [page]);
+  }, [page, debouncedSearch]);
 
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+
+  // Debounce Logic: Update 'debouncedSearch' only after 500ms of no typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1); // Reset to Page 1 when search changes
+    }, 500);
+
+    return () => clearTimeout(timer); // Cleanup if user types again
+  }, [searchTerm]);
 
   // Helper to format SQL Dates (2026-02-07T10:00:00.000Z) -> Readable
   const formatDate = (dateString: string) => {
@@ -64,12 +78,13 @@ const HistoriqueStock = () => {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "UTC",
     });
   };
 
   return (
     <div className="p-6 space-y-6">
-      {/* HEADER */}
+      {/* HEADER SECTION - Always Visible */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-slate-900">
@@ -81,36 +96,49 @@ const HistoriqueStock = () => {
           </p>
         </div>
 
-        <button
-          className="group relative overflow-hidden rounded-lg bg-sky-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-800"
-          onClick={() => setIsModalFormOpen(true)}
-        >
-          <span className="relative z-10 flex items-center gap-2">
-            <Plus size={18} />
-            Nouvelle Session
-          </span>
-          <span className="absolute inset-0 bg-linear-to-r from-sky-600 to-sky-700 opacity-0 transition group-hover:opacity-100" />
-        </button>
-      </div>
+        {/* SEARCH & ACTION BUTTONS */}
+        <div className="flex items-center gap-3">
+          {/* MOVED SEARCH BAR HERE */}
+          <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-500 transition focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500 w-64">
+            <Search size={14} />
+            <input
+              type="text"
+              placeholder="Recherche..."
+              className="bg-transparent outline-none placeholder:text-slate-400 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
 
-      {/* Loading */}
-      {isLoading && <Spinner />}
-
-      {/* Error */}
-      {!isLoading && error && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-          {error}
+          <button
+            className="group relative overflow-hidden rounded-lg bg-sky-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-800 cursor-pointer"
+            onClick={() => setIsModalFormOpen(true)}
+          >
+            <span className="relative z-10 flex items-center gap-2">
+              <Plus size={18} />
+              Nouvelle Session
+            </span>
+            <span className="absolute inset-0 bg-linear-to-r from-sky-600 to-sky-700 opacity-0 transition group-hover:opacity-100" />
+          </button>
         </div>
-      )}
-
-      {/* Empty */}
+      </div>
+      {/* DATA SECTION */}
+      {isLoading && <Spinner />}
+      {/* Empty State - Now with a "Clear Search" button */}
       {!isLoading && !error && sessions.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-white py-20 text-slate-500">
           <LayoutList className="mb-4 h-9 w-9 text-slate-400" />
           <span className="text-sm">Aucune session trouvée</span>
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="mt-4 text-sky-600 hover:underline text-sm font-medium cursor-pointer"
+            >
+              Effacer la recherche
+            </button>
+          )}
         </div>
-      )}
-
+      )}{" "}
       {/* Table */}
       {!isLoading && !error && sessions.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -119,11 +147,6 @@ const HistoriqueStock = () => {
             <h2 className="text-base font-semibold text-slate-900">
               Historique Stock
             </h2>
-
-            <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-              <Search size={14} />
-              <span>Recherche</span>
-            </div>
           </div>
 
           {/* Table */}
@@ -195,7 +218,7 @@ const HistoriqueStock = () => {
                   <td className="px-6 py-4 text-right">
                     <button
                       onClick={() => navigate(`/session/${session.id}`)}
-                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-sky-600 hover:text-sky-700"
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-sky-600 hover:text-sky-700 cursor-pointer"
                     >
                       Ouvrir
                     </button>
@@ -231,7 +254,6 @@ const HistoriqueStock = () => {
           </div>
         </div>
       )}
-
       <NewSessionModal
         isOpen={isModalFormOpen}
         onClose={() => setIsModalFormOpen(false)}

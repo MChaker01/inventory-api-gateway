@@ -3,55 +3,67 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { AxiosError } from "axios";
 import { api } from "../api/axios";
-import { ArrowLeft, Save, Search } from "lucide-react";
+import { generateExcelFile } from "../utils/exportToExcel";
+import SessionTable from "../components/SessionTable";
 
-interface SocketItem {
-  id: number;
-  code_article: string;
-  article: string;
-  Prix: number;
-  qte_globale: number; // Theory (System)
-  qte_physique: number; // Actual (Counted)
-}
+import {
+  Save,
+  Search,
+  Lock,
+  Package,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  BadgeCheck,
+  AlertTriangle,
+  Download,
+} from "lucide-react";
+
+import type { Session, SocketItem } from "../types/index";
 
 const SessionDetails = () => {
   const [items, setItems] = useState<SocketItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [session, setSession] = useState<Session | null>(null);
+  const [showErrorsOnly, setShowErrorsOnly] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { id } = useParams();
   const navigate = useNavigate();
-
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchItems = async () => {
+    const fetchData = async () => {
       try {
-        const response = await api.get(`/sessions/${id}/items`);
-        setItems(response.data.items);
+        const [sessionRes, itemsRes] = await Promise.all([
+          api.get(`/sessions/${id}`),
+          api.get(`/sessions/${id}/items`),
+        ]);
+
+        setSession(sessionRes.data);
+        setItems(itemsRes.data.items);
       } catch (error) {
-        console.error("Error loading items:", error);
+        console.error("Error loading data:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) fetchItems();
+    if (id) fetchData();
   }, [id]);
 
-  // Calculate totals only when 'items' changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, showErrorsOnly]);
+
   const stats = useMemo(() => {
     return items.reduce(
       (acc, item) => {
         const gap = item.qte_physique - item.qte_globale;
-
         return {
-          // Net Gap: (-5 + 2 = -3). Shows overall shortage/surplus.
           netGap: acc.netGap + gap,
-
-          // Absolute Error: (|-5| + |2| = 7). Shows how messy the inventory is.
           totalErrors: acc.totalErrors + (gap !== 0 ? 1 : 0),
-
           totalItems: acc.totalItems + 1,
           itemsCounted: acc.itemsCounted + (item.qte_physique > 0 ? 1 : 0),
         };
@@ -62,112 +74,109 @@ const SessionDetails = () => {
 
   const handleUpdateQuantity = async (itemId: number, newQuantity: string) => {
     const qty = parseFloat(newQuantity);
-
-    // 1. Validate
     if (isNaN(qty) || qty < 0) {
       alert("Invalid quantity");
       return;
     }
-
     try {
-      // 2. Call API (PUT /api/sessions/items/:id)
       await api.put(`/sessions/items/${itemId}`, { quantity: qty });
-
-      // 3. Update Local State (Visual feedback)
       setItems((prevItems) =>
         prevItems.map((item) =>
           item.id === itemId ? { ...item, qte_physique: qty } : item,
         ),
       );
-
-      console.log(`Item ${itemId} updated to ${qty}`);
     } catch (error) {
       console.error("Update failed", error);
-      alert("Failed to save quantity. Please try again.");
+      alert("Failed to save quantity.");
     }
   };
 
   const handleValidateSession = async () => {
-    // 1. Safety Check
     const confirm = window.confirm(
-      "Êtes-vous sûr de vouloir valider cet inventaire ?\n\nCette action est irréversible. Une fois validé, vous ne pourrez plus modifier les quantités.",
+      "Êtes-vous sûr de vouloir valider cet inventaire ?",
     );
-
     if (!confirm) return;
 
     try {
-      // 2. Call API
       await api.put(`/sessions/${id}/validate`, {
         username: user?.username || "Admin",
       });
-
-      // 3. Success Feedback
       alert("Inventaire validé avec succès !");
-
-      // 4. Redirect to Dashboard
       navigate("/");
     } catch (err) {
-      const error = err as AxiosError<{ message: string }>; // Type Casting
+      const error = err as AxiosError<{ message: string }>;
       alert(error.response?.data?.message || "Erreur lors de la validation");
     }
   };
 
-  // Filter items based on search
-  const filteredItems = items.filter(
-    (item) =>
-      item.article.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.code_article.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredItems = items.filter((item) => {
+    // FIX: If article name is missing, use empty string ""
+    const articleName = (item.article || "").toLowerCase();
+    const articleCode = (item.code_article || "").toLowerCase();
+    const search = searchTerm.toLowerCase();
+
+    const matchesSearch =
+      articleName.includes(search) || articleCode.includes(search);
+
+    if (showErrorsOnly) {
+      const gap = item.qte_physique - item.qte_globale;
+      return matchesSearch && gap !== 0;
+    }
+    return matchesSearch;
+  });
+
+  const handleExport = () => {
+    generateExcelFile({
+      items: filteredItems,
+      depot: session?.depot,
+      group: session?.group_article,
+      mode: showErrorsOnly ? "ECARTS" : "STOCK",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 p-6 space-y-6">
-      {/* HEADER */}
+      {/* HEADER SECTION */}
       <div className="mx-auto max-w-6xl space-y-6">
-        {/* Top Row: Back + Title */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="rounded-full p-2 text-slate-600 transition hover:bg-slate-200"
-            >
-              <ArrowLeft size={22} />
-            </button>
-
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-                Session #{id}
-              </h1>
-              <p className="text-sm text-slate-500">Comptage des articles</p>
-            </div>
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+              Session #{id}
+            </h1>
+            {session?.valide === 1 ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                <BadgeCheck size={14} />
+                Validée
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
+                <Lock size={14} />
+                En cours
+              </span>
+            )}
           </div>
+          <p className="text-sm text-slate-500">Comptage des articles</p>
         </div>
 
-        {/* Summary Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Progress Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-slate-500">
-                Progression du comptage
-              </p>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
-                📦
+          <div className="relative rounded-2xl border border-slate-200 bg-white p-6 transition">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <Package size={18} className="text-sky-600" />
+                <p className="text-sm font-medium text-slate-600">
+                  Progression
+                </p>
               </div>
             </div>
-
             <div className="flex items-end justify-between">
-              <div>
-                <p className="text-3xl font-bold text-slate-900">
-                  {stats.itemsCounted}
-                  <span className="text-base font-medium text-slate-400">
-                    {" "}
-                    / {stats.totalItems}
-                  </span>
-                </p>
-
-                <p className="text-xs text-slate-400 mt-1">Articles comptés</p>
-              </div>
-
+              <p className="text-3xl font-bold text-slate-900">
+                {stats.itemsCounted}
+                <span className="text-base font-medium text-slate-400">
+                  {" "}
+                  / {stats.totalItems}
+                </span>
+              </p>
               <p className="text-sm font-semibold text-sky-600">
                 {stats.totalItems > 0
                   ? Math.round((stats.itemsCounted / stats.totalItems) * 100)
@@ -175,10 +184,9 @@ const SessionDetails = () => {
                 %
               </p>
             </div>
-
             <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-linear-to-r from-sky-500 to-sky-600 transition-all duration-500"
+                className="h-full bg-sky-500"
                 style={{
                   width:
                     stats.totalItems > 0
@@ -190,144 +198,99 @@ const SessionDetails = () => {
           </div>
 
           {/* Gap Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-slate-500">Écart Global</p>
-
-              <div
-                className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                  stats.netGap === 0
-                    ? "bg-slate-100 text-slate-600"
-                    : stats.netGap > 0
-                      ? "bg-emerald-100 text-emerald-600"
-                      : "bg-red-100 text-red-600"
-                }`}
-              >
-                {stats.netGap === 0 ? "➖" : stats.netGap > 0 ? "⬆" : "⬇"}
+          <div className="relative rounded-2xl border border-slate-200 bg-white p-6 transition">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                {stats.netGap > 0 ? (
+                  <TrendingUp size={18} className="text-emerald-600" />
+                ) : stats.netGap < 0 ? (
+                  <TrendingDown size={18} className="text-red-600" />
+                ) : (
+                  <Minus size={18} className="text-slate-500" />
+                )}
+                <p className="text-sm font-medium text-slate-600">
+                  Écart Global
+                </p>
               </div>
             </div>
-
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-3xl font-bold ${
-                  stats.netGap === 0
-                    ? "text-slate-900"
-                    : stats.netGap > 0
-                      ? "text-emerald-600"
-                      : "text-red-600"
-                }`}
+                className={`text-3xl font-bold ${stats.netGap > 0 ? "text-emerald-600" : stats.netGap < 0 ? "text-red-600" : "text-slate-900"}`}
               >
                 {stats.netGap > 0 ? `+${stats.netGap}` : stats.netGap}
               </span>
-
               <span className="text-sm text-slate-400">unités</span>
             </div>
-
             <p className="text-xs text-slate-400 mt-2">
-              {stats.totalErrors} ligne{stats.totalErrors > 1 && "s"} avec écart
+              {stats.totalErrors} lignes avec écart
             </p>
           </div>
         </div>
 
-        {/* Action Bar */}
-        <div className="flex items-center justify-between pt-2">
-          <div className="relative">
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="text"
-              placeholder="Rechercher un article..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-72 rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20"
-            />
+        {/* SEARCH & ACTION BAR */}
+        <div className="flex items-center justify-between pt-3">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                placeholder="Rechercher..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-72 rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20"
+              />
+            </div>
+            <button
+              onClick={() => setShowErrorsOnly(!showErrorsOnly)}
+              className={`group inline-flex items-center gap-2 rounded-lg px-4 py-2.5 cursor-pointer text-sm font-medium transition-all border ${showErrorsOnly ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"}`}
+            >
+              <AlertTriangle
+                size={16}
+                className={showErrorsOnly ? "text-amber-600" : "text-slate-400"}
+              />
+              {showErrorsOnly ? "Afficher tout" : "Voir les écarts"}
+            </button>
           </div>
 
-          <button
-            onClick={handleValidateSession}
-            className="group relative overflow-hidden rounded-lg bg-sky-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-sky-800 shadow-sm"
-          >
-            <span className="relative z-10 flex items-center gap-2">
-              <Save size={16} />
-              Valider
-            </span>
-            <span className="absolute inset-0 bg-linear-to-r from-sky-600 to-sky-700 opacity-0 transition group-hover:opacity-100" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition text-sm font-medium cursor-pointer"
+            >
+              <Download size={18} /> Exporter
+            </button>
+            {session?.valide === 0 ? (
+              <button
+                onClick={handleValidateSession}
+                className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg bg-sky-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:shadow-md cursor-pointer"
+              >
+                <span className="relative z-10 flex items-center gap-2">
+                  <Save size={16} /> Valider
+                </span>
+                <span className="absolute inset-0 bg-linear-to-r from-sky-600 to-sky-700 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              </button>
+            ) : (
+              <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-5 py-2.5 text-sm font-medium text-slate-500">
+                <Lock size={16} /> Verrouillé
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* TABLE */}
-      <div className="mx-auto max-w-6xl overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500">
-            <tr>
-              <th className="px-6 py-4 text-left font-medium">Code</th>
-              <th className="px-6 py-4 text-left font-medium">Article</th>
-              <th className="px-6 py-4 text-center font-medium">Qté Système</th>
-              <th className="px-6 py-4 text-center font-medium w-36">
-                Qté Physique
-              </th>
-              <th className="px-6 py-4 text-center">Ecart</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-slate-200">
-            {filteredItems.map((item) => {
-              // 1. Calculate the Gap
-              const gap = item.qte_physique - item.qte_globale;
-
-              // 3. Determine Color (Visual Feedback)
-              let colorClass = "text-slate-500"; // Default (Zero)
-              if (gap < 0) colorClass = "text-red-600 font-bold"; // Loss
-              if (gap > 0) colorClass = "text-emerald-600 font-bold"; // Surplus
-
-              return (
-                <tr key={item.id} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 font-mono text-slate-600">
-                    {item.code_article}
-                  </td>
-
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {item.article}
-                  </td>
-
-                  <td className="px-6 py-4 text-center text-slate-500">
-                    {item.qte_globale}
-                  </td>
-
-                  <td className="px-6 py-4 text-center">
-                    <input
-                      type="number"
-                      min="0"
-                      defaultValue={item.qte_physique}
-                      onBlur={(e) =>
-                        handleUpdateQuantity(item.id, e.target.value)
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") e.currentTarget.blur();
-                      }}
-                      className="w-24 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center font-semibold text-slate-900 outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20"
-                    />
-                  </td>
-
-                  {/* NEW: Ecart Column */}
-                  <td className={`px-6 py-4 text-center ${colorClass}`}>
-                    {gap > 0 ? `+${gap}` : gap}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        {/* Empty */}
-        {filteredItems.length === 0 && !isLoading && (
-          <div className="py-16 text-center text-sm text-slate-500">
-            Aucun article trouvé.
-          </div>
-        )}
+      <div className="mx-auto max-w-6xl">
+        <SessionTable
+          items={filteredItems}
+          isLoading={isLoading}
+          isLocked={session?.valide === 1}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+          onUpdateQuantity={handleUpdateQuantity}
+        />
       </div>
     </div>
   );

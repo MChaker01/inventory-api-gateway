@@ -8,12 +8,14 @@ import { ISession } from "../types";
 
 export const getActiveSessions = async (req: Request, res: Response) => {
   try {
+    const pool = (req as any).pool; // The Key
+
     // Select the columns: id, depot, date, group_article, valide.
-    const result = await sql.query`
+    const result = await pool.request().query(`
             SELECT id, depot, date, group_article, valide 
             FROM Groupe_stock
             WHERE valide = 0 
-            ORDER BY date DESC`;
+            ORDER BY date DESC`);
 
     res.status(200).json({
       success: true,
@@ -34,7 +36,12 @@ export const getSessionHistory = async (req: Request, res: Response) => {
     const search = (req.query.search as string) || "";
     const offset = (page - 1) * limit;
 
-    const request = new sql.Request();
+    // Get the pool from the request (injected by branchDetector)
+    const pool = (req as any).pool;
+
+    // Create the request FROM THE POOL
+    const request = pool.request();
+
     request.input("offset", sql.Int, offset);
     request.input("limit", sql.Int, limit);
     request.input("search", sql.VarChar, `%${search}%`);
@@ -81,12 +88,14 @@ export const getSessionHistory = async (req: Request, res: Response) => {
 export const getSessionById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const pool = (req as any).pool;
 
-    const result = await sql.query`
-      SELECT id, depot, date, group_article, valide, id_chef 
-      FROM Groupe_stock 
-      WHERE id = ${id}
-    `;
+    const result = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query(
+        "SELECT id, depot, date, group_article, valide, id_chef FROM Groupe_stock WHERE id = @id",
+      );
 
     if (result.recordset.length === 0) {
       return res.status(404).json({ message: "Session not found" });
@@ -100,68 +109,69 @@ export const getSessionById = async (req: Request, res: Response) => {
 };
 
 export const createSession = async (req: Request, res: Response) => {
-  const transaction = new sql.Transaction();
+  const pool = (req as any).pool;
+  const transaction = new sql.Transaction(pool);
+
   try {
     const { depot, group_article, id_chef, items } = req.body;
+    let now = new Date();
 
-    if (!items || items.length === 0) {
-      return res.status(400).json({ message: "Cannot create empty session" });
-    }
-
-    // 1. Begin Transaction
     await transaction.begin();
 
-    // 2. Create the Session Header (Groupe_stock)
-    // We use a Request attached to the Transaction
     const requestHeader = new sql.Request(transaction);
-
     requestHeader.input("depot", sql.VarChar, depot);
     requestHeader.input("group", sql.VarChar, group_article);
     requestHeader.input("chef", sql.VarChar, id_chef);
-    // id_control is null initially
-    // valide = 0 (En cours)
+    requestHeader.input("now", sql.DateTime, now);
 
-    const headerResult = await requestHeader.query`
-      INSERT INTO Groupe_stock (depot, group_article, date, id_chef, valide)
-      VALUES (@depot, @group, GETDATE(), @chef, 0);
+    // 🛡️ LEGACY FIX: Set id_control = id_chef to avoid mobile crash
+    const headerResult = await requestHeader.query(`
+      INSERT INTO Groupe_stock (depot, group_article, date, id_chef, valide, id_control)
+      VALUES (@depot, @group, @now, @chef, 0, @chef); 
       SELECT SCOPE_IDENTITY() AS id;
-    `;
+    `);
 
     const sessionId = headerResult.recordset[0].id;
 
-    // 3. Insert Items (The "Pages" of the notebook)
-    // For 500 items, we can loop. It's not the fastest, but it's safe for now.
-    // (In the future, we can optimize with sql.Table for bulk insert)
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
       const requestItem = new sql.Request(transaction);
 
-      // item.code_article coming from Excel/React
-      // item.qte_globale coming from Excel "Stk Unité"
-      requestItem.input("sid", sql.Int, sessionId);
-      requestItem.input("code", sql.VarChar, item.code_article);
-      // 1. Pass the name from Excel
-      requestItem.input("name", sql.VarChar, item.article_name || "");
-      requestItem.input("qty_sys", sql.Float, item.qte_globale || 0);
-      // qte_physique starts at 0
+      // 🛡️ LEGACY FIX: Stagger dates by 10ms to prevent key collisions
+      const staggeredDate = new Date(now.getTime() + i * 10);
 
-      // 2. Insert into 'descreption' (Note the DB typo)
-      await requestItem.query`INSERT INTO Stock_item 
-  (id_group_stock, id_article, qte_globale, qte_physique, Qte_sosadis, qte_perime_nr, descreption)
-  VALUES (@sid, @code, @qty_sys, 0, 0, 0, @name)`;
+      requestItem.input("sid", sql.Int, sessionId);
+      requestItem.input("code", sql.VarChar, item.code_article.trim());
+      requestItem.input("itemDate", sql.DateTime, staggeredDate);
+      requestItem.input("chef", sql.VarChar, id_chef);
+
+      const qtySys = parseFloat(item.qte_globale || 0);
+
+      await requestItem.query(`
+        INSERT INTO Stock_item 
+        (
+          id_group_stock, id_article, qte_globale, qte_physique, 
+          date, id_control, Qte_sosadis, qte_perime_ph, 
+          descreption, qte_perime_nr, qrcode
+        )
+        VALUES (
+          @sid, @code, ${qtySys}, 
+          0,          -- RESTORED: Count starts at 0
+          @itemDate, @chef, 0, 0, 
+          '-',        -- RESTORED: Using dash to prevent UI/String crashes
+          NULL, ''    -- LEGACY FIX: Empty string qrcode
+        )
+      `);
     }
 
-    // 4. Commit (Save everything)
     await transaction.commit();
-
     res.status(201).json({
       success: true,
-      message: `Session ${sessionId} created with ${items.length} items.`,
+      message: `Session ${sessionId} créée avec succès.`,
     });
   } catch (error) {
-    // 5. Rollback (Undo everything if error)
     if (transaction) await transaction.rollback();
     console.error("Transaction Error:", error);
-
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 };
@@ -170,29 +180,28 @@ export const createSession = async (req: Request, res: Response) => {
 // @route   GET /api/sessions/:id/items
 export const getSessionItems = async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id as string); // Validates it's a number
+    const sessionId = parseInt(req.params.id as string);
+    const pool = (req as any).pool;
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("sid", sql.Int, sessionId);
 
-    // FIX:
-    // 1. Use 'id_article' (from Stock_item) as 'code_article'
-    // 2. JOIN with Article table to get the name ('article' column)
     const query = `
       SELECT 
         si.id, 
         si.id_article AS code_article, 
-                -- LOGIC: Try to get name from Master Table. If NULL, use the backup from Excel (descreption)
-                COALESCE(A.article, si.descreption, 'Article Inconnu') AS article, 
-
+        -- Fallback to 'descreption' if the master Article table doesn't have the item
+        COALESCE(A.article, si.descreption, 'Article Inconnu') AS article, 
         A.Prix,
-        si.qte_globale, 
-        si.qte_physique,
-        si.qrcode
+        COALESCE(si.qte_globale, 0) as qte_globale, 
+        COALESCE(si.qte_physique, 0) as qte_physique,
+        COALESCE(si.qte_perime_nr, 0) as qte_perime_nr,
+        COALESCE(si.qte_perime_ph, 0) as qte_perime_ph,
+        si.date
       FROM Stock_item si
       LEFT JOIN Article A ON si.id_article = A.code_article
       WHERE si.id_group_stock = @sid
-      ORDER BY A.article ASC
+      ORDER BY si.date ASC
     `;
 
     const result = await request.query(query);
@@ -211,9 +220,14 @@ export const getSessionItems = async (req: Request, res: Response) => {
 export const updateItemCount = async (req: Request, res: Response) => {
   try {
     const itemId = req.params.id;
-    const qte_physique = req.body.quantity;
+    // Support both Web (quantity) and Mobile (qte_physique) field names
+    const qte_physique = req.body.quantity ?? req.body.qte_physique;
 
-    const request = new sql.Request();
+    // 1. Get the pool from the request (injected by middleware)
+    const pool = (req as any).pool;
+
+    // 2. Create the request FROM THE POOL, not from global sql
+    const request = pool.request();
 
     request.input("item_id", sql.Int, itemId);
     request.input("qte_physique", sql.Float, qte_physique);
@@ -246,7 +260,9 @@ export const validateSession = async (req: Request, res: Response) => {
     const { username } = req.body;
     const sessionId = req.params.id;
 
-    const request = new sql.Request();
+    // Get the pool
+    const pool = (req as any).pool;
+    const request = pool.request();
 
     // 2. Fix Types: IDs are Int, Usernames are VarChar
     request.input("id", sql.Int, sessionId);

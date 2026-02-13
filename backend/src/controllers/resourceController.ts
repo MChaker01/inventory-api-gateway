@@ -5,12 +5,11 @@ import { Request, Response } from "express";
 // @route   GET /api/resources/depots
 export const getDepots = async (req: Request, res: Response) => {
   try {
-    // We only need the name for the dropdown
-    const result = await sql.query("SELECT nom FROM depot ORDER BY nom ASC");
-
-    // Return a simple array of strings:
+    const pool = (req as any).pool as sql.ConnectionPool;
+    const result = await pool
+      .request()
+      .query("SELECT nom FROM depot ORDER BY nom ASC");
     const depots = result.recordset.map((row: any) => row.nom);
-
     res.status(200).json(depots);
   } catch (error) {
     console.error("Error fetching depots:", error);
@@ -22,11 +21,11 @@ export const getDepots = async (req: Request, res: Response) => {
 // @route   GET /api/resources/groups
 export const getGroups = async (req: Request, res: Response) => {
   try {
-    // Note: The column name in your schema is 'Nom' (Capital N)
-    const result = await sql.query("SELECT Nom FROM Groupe ORDER BY Nom ASC");
-
+    const pool = (req as any).pool as sql.ConnectionPool;
+    const result = await pool
+      .request()
+      .query("SELECT Nom FROM Groupe ORDER BY Nom ASC");
     const groups = result.recordset.map((row: any) => row.Nom);
-
     res.status(200).json(groups);
   } catch (error) {
     console.error("Error fetching groups:", error);

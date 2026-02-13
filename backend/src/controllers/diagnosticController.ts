@@ -6,13 +6,15 @@ import { Request, Response } from "express";
 
 export const getTables = async (req: Request, res: Response) => {
   try {
-    // 1. Get the pool connection (already open)
+    // 1. Get the pool connection
+    const pool = (req as any).pool;
+
     // 2. Create a request object
-    const result = await sql.query`
+    const result = await pool.request().query(`
             SELECT TABLE_NAME 
             FROM INFORMATION_SCHEMA.TABLES 
             WHERE TABLE_TYPE = 'BASE TABLE'
-        `;
+        `);
 
     // SQL returns data in a 'recordset' array
     res.status(200).json({
@@ -32,11 +34,13 @@ export const getTables = async (req: Request, res: Response) => {
 
 export const getArticleSchema = async (req: Request, res: Response) => {
   try {
-    const result = await sql.query`
+    const pool = (req as any).pool;
+
+    const result = await pool.request().query(`
             SELECT COLUMN_NAME
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_NAME = 'Article'
-        `;
+        `);
 
     res.status(200).json({
       success: true,

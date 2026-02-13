@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { api } from "../api/axios"; // Import API
 import { useAuth } from "../context/AuthContext"; // Import Auth to get username
 import { AxiosError } from "axios";
+import { AlertTriangle } from "lucide-react";
 
 // 1. Define Props Interface
 interface NewSessionModalProps {
@@ -237,7 +238,7 @@ const NewSessionModal = ({
           />
           {isLoading && (
             <p className="text-sm text-slate-500 mt-2">
-              📄 Lecture du fichier en cours...
+              Lecture du fichier en cours...
             </p>
           )}
         </div>
@@ -245,7 +246,7 @@ const NewSessionModal = ({
         {/* Error Display */}
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-            ⚠️ {error}
+            <AlertTriangle size={16} /> {error}
           </div>
         )}
 
@@ -254,7 +255,7 @@ const NewSessionModal = ({
           <div className="mb-4 border border-slate-200 rounded-lg overflow-hidden">
             <div className="bg-slate-100 px-4 py-2 flex items-center justify-between">
               <span className="text-sm font-medium text-slate-700">
-                📦 {parsedItems.length} articles importés
+                {parsedItems.length} articles importés
               </span>
               <button
                 onClick={() => {

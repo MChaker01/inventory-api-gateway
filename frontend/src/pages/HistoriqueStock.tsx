@@ -97,9 +97,9 @@ const HistoriqueStock = () => {
         </div>
 
         {/* SEARCH & ACTION BUTTONS */}
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
           {/* MOVED SEARCH BAR HERE */}
-          <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-500 transition focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500 w-64">
+          <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-500 transition focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500 w-full sm:w-64">
             <Search size={14} />
             <input
               type="text"
@@ -141,7 +141,7 @@ const HistoriqueStock = () => {
       )}{" "}
       {/* Table */}
       {!isLoading && !error && sessions.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="rounded-xl border border-slate-200 bg-white">
           {/* Table Header */}
           <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
             <h2 className="text-base font-semibold text-slate-900">
@@ -150,83 +150,89 @@ const HistoriqueStock = () => {
           </div>
 
           {/* Table */}
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                <th className="px-6 py-3 text-left font-medium">ID</th>
-                <th className="px-6 py-3 text-left font-medium">État</th>
-                <th className="px-6 py-3 text-left font-medium">
-                  Date & Heure
-                </th>
-                <th className="px-6 py-3 text-left font-medium">
-                  Dépôt / Groupe
-                </th>
-                <th className="px-6 py-3 text-left font-medium">Responsable</th>
-                <th className="px-6 py-3 text-right font-medium">Action</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-200">
-              {sessions.map((session) => (
-                <tr key={session.id} className="transition hover:bg-slate-50">
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    #{session.id}
-                  </td>
-
-                  <td className="px-6 py-4">
-                    {session.valide === 1 ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
-                        <CheckCircle2 size={12} />
-                        VALIDÉ
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                        <Clock size={12} />
-                        EN COURS
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="px-6 py-4 text-slate-600">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={14} />
-                      {formatDate(session.date)}
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-slate-900">
-                        {session.group_article}
-                      </span>
-                      <span className="flex items-center gap-1 text-xs text-slate-500">
-                        <MapPin size={12} />
-                        {session.depot}
-                      </span>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-700">
-                        {session.id_chef.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-slate-700">{session.id_chef}</span>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => navigate(`/session/${session.id}`)}
-                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-sky-600 hover:text-sky-700 cursor-pointer"
-                    >
-                      Ouvrir
-                    </button>
-                  </td>
+          <div className="w-full overflow-x-auto">
+            <table className="min-w-225 w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-6 py-3 text-left font-medium whitespace-nowrap">ID</th>
+                  <th className="px-6 py-3 text-left font-medium whitespace-nowrap">État</th>
+                  <th className="px-6 py-3 text-left font-medium whitespace-nowrap">
+                    Date & Heure
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium whitespace-nowrap">
+                    Dépôt / Groupe
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium whitespace-nowrap">
+                    Responsable
+                  </th>
+                  <th className="px-6 py-3 text-right font-medium whitespace-nowrap">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody className="divide-y divide-slate-200">
+                {sessions.map((session) => (
+                  <tr key={session.id} className="transition hover:bg-slate-50">
+                    <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
+                      #{session.id}
+                    </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {session.valide === 1 ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
+                          <CheckCircle2 size={12} />
+                          VALIDÉ
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                          <Clock size={12} />
+                          EN COURS
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} />
+                        {formatDate(session.date)}
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-slate-900">
+                          {session.group_article}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-slate-500">
+                          <MapPin size={12} />
+                          {session.depot}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-700">
+                          {session.id_chef.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-slate-700">
+                          {session.id_chef}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => navigate(`/session/${session.id}`)}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-sky-600 hover:text-sky-700 cursor-pointer"
+                      >
+                        Ouvrir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {/* Pagination */}
           <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">

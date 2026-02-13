@@ -136,55 +136,54 @@ const SessionDetails = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6 space-y-6">
-      {/* HEADER SECTION */}
+    <div className="min-h-screen bg-slate-100 p-4 sm:p-6 space-y-6">
       <div className="mx-auto max-w-6xl space-y-6">
-        {/* Title Block with Back Button */}
-        <div className="flex items-start gap-4">
-          <button
-            onClick={() => navigate("/")}
-            className="mt-1 rounded-full p-2 text-slate-400 hover:bg-white hover:text-slate-700 transition-all border border-transparent hover:border-slate-200 cursor-pointer"
-            title="Retour à la liste"
-          >
-            <ArrowLeft size={24} />
-          </button>
+        {/* HEADER */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <button
+              onClick={() => navigate("/")}
+              className="mt-1 rounded-full p-2 text-slate-400 hover:bg-white hover:text-slate-700 transition-all border border-transparent hover:border-slate-200 cursor-pointer"
+            >
+              <ArrowLeft size={22} />
+            </button>
 
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-                Session #{id}
-              </h1>
-              {session?.valide === 1 ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-                  <BadgeCheck size={14} />
-                  Validée
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
-                  <Lock size={14} />
-                  En cours
-                </span>
-              )}
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">
+                  Session #{id}
+                </h1>
+
+                {session?.valide === 1 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                    <BadgeCheck size={14} />
+                    Validée
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
+                    <Lock size={14} />
+                    En cours
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-500">Comptage des articles</p>
             </div>
-            <p className="text-sm text-slate-500">Comptage des articles</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Progress Card */}
-          <div className="relative rounded-2xl border border-slate-200 bg-white p-6 transition">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <Package size={18} className="text-sky-600" />
-                <p className="text-sm font-medium text-slate-600">
-                  Progression
-                </p>
-              </div>
+        {/* STATS CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          {/* Progress */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Package size={18} className="text-sky-600" />
+              <p className="text-sm font-medium text-slate-600">Progression</p>
             </div>
+
             <div className="flex items-end justify-between">
-              <p className="text-3xl font-bold text-slate-900">
+              <p className="text-2xl sm:text-3xl font-bold text-slate-900">
                 {stats.itemsCounted}
-                <span className="text-base font-medium text-slate-400">
+                <span className="text-base text-slate-400">
                   {" "}
                   / {stats.totalItems}
                 </span>
@@ -196,7 +195,8 @@ const SessionDetails = () => {
                 %
               </p>
             </div>
-            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+
+            <div className="mt-4 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
               <div
                 className="h-full bg-sky-500"
                 style={{
@@ -209,40 +209,44 @@ const SessionDetails = () => {
             </div>
           </div>
 
-          {/* Gap Card */}
-          <div className="relative rounded-2xl border border-slate-200 bg-white p-6 transition">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                {stats.netGap > 0 ? (
-                  <TrendingUp size={18} className="text-emerald-600" />
-                ) : stats.netGap < 0 ? (
-                  <TrendingDown size={18} className="text-red-600" />
-                ) : (
-                  <Minus size={18} className="text-slate-500" />
-                )}
-                <p className="text-sm font-medium text-slate-600">
-                  Écart Global
-                </p>
-              </div>
+          {/* GAP */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              {stats.netGap > 0 ? (
+                <TrendingUp size={18} className="text-emerald-600" />
+              ) : stats.netGap < 0 ? (
+                <TrendingDown size={18} className="text-red-600" />
+              ) : (
+                <Minus size={18} className="text-slate-500" />
+              )}
+              <p className="text-sm font-medium text-slate-600">Écart Global</p>
             </div>
-            <div className="flex items-baseline gap-2">
+
+            <div className="flex flex-wrap items-baseline gap-2">
               <span
-                className={`text-3xl font-bold ${stats.netGap > 0 ? "text-emerald-600" : stats.netGap < 0 ? "text-red-600" : "text-slate-900"}`}
+                className={`text-2xl sm:text-3xl font-bold ${
+                  stats.netGap > 0
+                    ? "text-emerald-600"
+                    : stats.netGap < 0
+                      ? "text-red-600"
+                      : "text-slate-900"
+                }`}
               >
                 {stats.netGap > 0 ? `+${stats.netGap}` : stats.netGap}
               </span>
               <span className="text-sm text-slate-400">unités</span>
             </div>
+
             <p className="text-xs text-slate-400 mt-2">
               {stats.totalErrors} lignes avec écart
             </p>
           </div>
         </div>
 
-        {/* SEARCH & ACTION BAR */}
-        <div className="flex items-center justify-between pt-3">
-          <div className="flex items-center gap-3">
-            <div className="relative">
+        {/* SEARCH & ACTIONS */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-72">
               <Search
                 size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -252,41 +256,44 @@ const SessionDetails = () => {
                 placeholder="Rechercher..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-72 rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20"
+                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20"
               />
             </div>
+
             <button
               onClick={() => setShowErrorsOnly(!showErrorsOnly)}
-              className={`group inline-flex items-center gap-2 rounded-lg px-4 py-2.5 cursor-pointer text-sm font-medium transition-all border ${showErrorsOnly ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"}`}
+              className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 cursor-pointer text-sm font-medium border transition ${
+                showErrorsOnly
+                  ? "bg-amber-100 text-amber-800 border-amber-300"
+                  : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+              }`}
             >
-              <AlertTriangle
-                size={16}
-                className={showErrorsOnly ? "text-amber-600" : "text-slate-400"}
-              />
+              <AlertTriangle size={16} />
               {showErrorsOnly ? "Afficher tout" : "Voir les écarts"}
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <button
               onClick={handleExport}
-              className="flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition text-sm font-medium cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm font-medium cursor-pointer"
             >
-              <Download size={18} /> Exporter
+              <Download size={18} />
+              Exporter
             </button>
+
             {session?.valide === 0 ? (
               <button
                 onClick={handleValidateSession}
-                className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg bg-sky-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:shadow-md cursor-pointer"
+                className="flex items-center justify-center gap-2 rounded-lg bg-sky-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-sky-800"
               >
-                <span className="relative z-10 flex items-center gap-2">
-                  <Save size={16} /> Valider
-                </span>
-                <span className="absolute inset-0 bg-linear-to-r from-sky-600 to-sky-700 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                <Save size={16} />
+                Valider
               </button>
             ) : (
-              <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-5 py-2.5 text-sm font-medium text-slate-500">
-                <Lock size={16} /> Verrouillé
+              <div className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-5 py-2.5 text-sm font-medium text-slate-500">
+                <Lock size={16} />
+                Verrouillé
               </div>
             )}
           </div>

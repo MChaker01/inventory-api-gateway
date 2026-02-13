@@ -162,7 +162,17 @@ const NewSessionModal = ({
         items: parsedItems,
       };
 
-      await api.post("/sessions", payload);
+      const response = await api.post("/sessions", payload);
+      const { newArticlesCount } = response.data;
+
+      // Notify the user specifically about new articles
+      if (newArticlesCount > 0) {
+        alert(
+          `Succès ! Session créée et ${newArticlesCount} nouveaux articles ont été ajoutés au référentiel.`,
+        );
+      } else {
+        alert("Session créée avec succès !");
+      }
 
       onSuccess(); // Refresh Parent
       onClose(); // Close Modal

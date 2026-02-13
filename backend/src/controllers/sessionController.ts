@@ -111,6 +111,7 @@ export const getSessionById = async (req: Request, res: Response) => {
 export const createSession = async (req: Request, res: Response) => {
   const pool = (req as any).pool;
   const transaction = new sql.Transaction(pool);
+  let newArticlesCount = 0;
 
   try {
     const { depot, group_article, id_chef, items } = req.body;
@@ -124,7 +125,7 @@ export const createSession = async (req: Request, res: Response) => {
     requestHeader.input("chef", sql.VarChar, id_chef);
     requestHeader.input("now", sql.DateTime, now);
 
-    // 🛡️ LEGACY FIX: Set id_control = id_chef to avoid mobile crash
+    // LEGACY FIX: Set id_control = id_chef to avoid mobile crash
     const headerResult = await requestHeader.query(`
       INSERT INTO Groupe_stock (depot, group_article, date, id_chef, valide, id_control)
       VALUES (@depot, @group, @now, @chef, 0, @chef); 
@@ -137,11 +138,38 @@ export const createSession = async (req: Request, res: Response) => {
       const item = items[i];
       const requestItem = new sql.Request(transaction);
 
-      // 🛡️ LEGACY FIX: Stagger dates by 10ms to prevent key collisions
       const staggeredDate = new Date(now.getTime() + i * 10);
+      const articleCode = item.code_article.trim();
+      const articleName = item.article_name || "Nouveau Produit";
 
+      // Use the transaction-bound request for the check!
+      const checkRequest = new sql.Request(transaction);
+      checkRequest.input("code", sql.VarChar, articleCode);
+
+      // --- STEP A: REGISTER NEW ARTICLE IF MISSING ---
+      // We check if the article exists in the master table
+      const checkArticle = await checkRequest.query(
+        "SELECT 1 FROM Article WHERE code_article = @code",
+      );
+
+      if (checkArticle.recordset.length === 0) {
+        newArticlesCount++;
+
+        const regRequest = new sql.Request(transaction);
+        regRequest.input("code", sql.VarChar, articleCode);
+        regRequest.input("name", sql.VarChar, articleName);
+        regRequest.input("grp", sql.VarChar, group_article); // Use current session group
+
+        // Insert into Master Article Table with default values
+        await regRequest.query(`
+          INSERT INTO Article (code_article, article, groupe, famille, souss_famille, Prix, Qrcode)
+          VALUES (@code, @name, @grp, 'NON CLASSIFIE', 'NON CLASSIFIE', 0, '')
+        `);
+      }
+
+      // --- STEP B: INSERT INTO STOCK_ITEM (As before) ---
       requestItem.input("sid", sql.Int, sessionId);
-      requestItem.input("code", sql.VarChar, item.code_article.trim());
+      requestItem.input("code", sql.VarChar, articleCode);
       requestItem.input("itemDate", sql.DateTime, staggeredDate);
       requestItem.input("chef", sql.VarChar, id_chef);
 
@@ -149,18 +177,8 @@ export const createSession = async (req: Request, res: Response) => {
 
       await requestItem.query(`
         INSERT INTO Stock_item 
-        (
-          id_group_stock, id_article, qte_globale, qte_physique, 
-          date, id_control, Qte_sosadis, qte_perime_ph, 
-          descreption, qte_perime_nr, qrcode
-        )
-        VALUES (
-          @sid, @code, ${qtySys}, 
-          0,          -- RESTORED: Count starts at 0
-          @itemDate, @chef, 0, 0, 
-          '-',        -- RESTORED: Using dash to prevent UI/String crashes
-          NULL, ''    -- LEGACY FIX: Empty string qrcode
-        )
+        (id_group_stock, id_article, qte_globale, qte_physique, date, id_control, Qte_sosadis, qte_perime_ph, descreption, qte_perime_nr, qrcode)
+        VALUES (@sid, @code, ${qtySys}, 0, @itemDate, @chef, 0, 0, '-', NULL, '')
       `);
     }
 
@@ -168,6 +186,7 @@ export const createSession = async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       message: `Session ${sessionId} créée avec succès.`,
+      newArticlesCount: newArticlesCount,
     });
   } catch (error) {
     if (transaction) await transaction.rollback();

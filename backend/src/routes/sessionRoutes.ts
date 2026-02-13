@@ -11,7 +11,7 @@ import {
 } from "../controllers/sessionController";
 import { protect } from "../middleware/authMiddleware";
 
-// router.use(protect);
+router.use(protect);
 
 router.get("/", getActiveSessions);
 router.get("/history", getSessionHistory);

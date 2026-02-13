@@ -12,7 +12,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, branch: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
   error: string | null;
@@ -48,21 +48,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuth();
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, branch: string) => {
     try {
+      // CRITICAL: Save branch FIRST so the interceptor picks it up
+      localStorage.setItem("branch", branch);
+
+      // call the API. The interceptor will add "x-branch: branch"
       const response = await api.post("/auth/login", { username, password });
 
       const { token, user } = response.data; // Extract data
 
       // 1. Save Token (It's already a string)
       localStorage.setItem("token", token);
-
       // 2. Save User (It's an Object -> Convert to String)
       localStorage.setItem("user", JSON.stringify(user));
 
       // 3. Update State (React wants the Object, not the string)
       setUser(user);
-
       // Clear errors
       setError(null);
     } catch (err) {

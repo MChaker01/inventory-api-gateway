@@ -17,6 +17,7 @@ import {
   BadgeCheck,
   AlertTriangle,
   Download,
+  ArrowLeft,
 } from "lucide-react";
 
 import type { Session, SocketItem } from "../types/index";
@@ -138,24 +139,35 @@ const SessionDetails = () => {
     <div className="min-h-screen bg-slate-100 p-6 space-y-6">
       {/* HEADER SECTION */}
       <div className="mx-auto max-w-6xl space-y-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-              Session #{id}
-            </h1>
-            {session?.valide === 1 ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-                <BadgeCheck size={14} />
-                Validée
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
-                <Lock size={14} />
-                En cours
-              </span>
-            )}
+        {/* Title Block with Back Button */}
+        <div className="flex items-start gap-4">
+          <button
+            onClick={() => navigate("/")}
+            className="mt-1 rounded-full p-2 text-slate-400 hover:bg-white hover:text-slate-700 transition-all border border-transparent hover:border-slate-200 cursor-pointer"
+            title="Retour à la liste"
+          >
+            <ArrowLeft size={24} />
+          </button>
+
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+                Session #{id}
+              </h1>
+              {session?.valide === 1 ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                  <BadgeCheck size={14} />
+                  Validée
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
+                  <Lock size={14} />
+                  En cours
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-slate-500">Comptage des articles</p>
           </div>
-          <p className="text-sm text-slate-500">Comptage des articles</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

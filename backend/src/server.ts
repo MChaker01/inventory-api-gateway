@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { connectDB } from "./config/db";
+import { branchDetector } from "./middleware/branchMiddleware";
 
 import diagnosticRoutes from "./routes/diagnosticRoutes";
 import articleRoutes from "./routes/articleRoutes";
@@ -12,9 +13,19 @@ const app = express();
 
 // middlewares
 
+app.use((req, res, next) => {
+  console.log(
+    `\n🔎 [${new Date().toLocaleTimeString()}] ${req.method} ${req.originalUrl}`,
+  );
+  // Log Headers to check for Auth tokens or Content-Type
+  // console.log("Headers:", req.headers);
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173" }));
+app.use(branchDetector);
 
 // Routes
 

@@ -16,6 +16,11 @@ api.interceptors.request.use((config) => {
     // attach token to every request.
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Get Branch (City) - Default to 'agadir' if missing
+  const branch = localStorage.getItem("branch") || "agadir";
+  config.headers["x-branch"] = branch;
+
   return config;
 });
 
